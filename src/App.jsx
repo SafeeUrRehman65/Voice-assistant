@@ -214,21 +214,32 @@ function App() {
 
       voiceIntervalRef.current = setInterval(() => {
         const isSpeaking = detectVoiceActivity();
+
         if (isSpeaking) {
           speechCounter.current++;
           if (speechCounter.current > 2 && currentState !== STATES.LISTENING) {
-            //Cancel or halt any previous api requests made and listen to user
             cancelCurrentOperation();
             setCurrentState(STATES.LISTENING);
             speechCounter.current = 0;
           }
+
+          // reset silence timer while speaking
+          if (silenceTimerRef.current) {
+            clearTimeout(silenceTimerRef.current);
+            silenceTimerRef.current = null;
+          }
         } else {
           speechCounter.current = 0;
+          if (!silenceTimerRef.current && currentState === STATES.LISTENING) {
+            silenceTimerRef.current = setTimeout(() => {
+              console.log("Stopping audio after silence");
+              mediaRecorderRef.current.stop();
+              setisRecording(false);
+              setCurrentState(STATES.PROCESSING);
+            }, 1500); // 1.5s silence
+          }
         }
-        if (!isSpeaking && currentState === STATES.LISTENING) {
-          stopRecording();
-        }
-      }, 1500);
+      }, 200);
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
@@ -264,41 +275,42 @@ function App() {
 
   // logic to stop recording if user is silent for 1.5s
 
-  const stopRecording = () => {
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-    }
-    silenceTimerRef.current = setTimeout(() => {
-      if (currentState === STATES.LISTENING) {
-        console.log("Stopping audio");
-        mediaRecorderRef.current.stop();
-        setisRecording(false);
-        setCurrentState(STATES.PROCESSING);
-        console.log(mediaRecorderRef.current.state);
-        startRecording()
-        
-        console.log("Recorder stopped!");
-      }
-    }, 1500);
-  };
+  // const stopRecording = () => {
+  //   if (silenceTimerRef.current) {
+  //     clearTimeout(silenceTimerRef.current);
+  //   }
+  //   silenceTimerRef.current = setTimeout(() => {
+  //     if (currentState === STATES.LISTENING) {
+  //       console.log("Stopping audio");
+  //       mediaRecorderRef.current.stop();
+  //       setisRecording(false);
+  //       setCurrentState(STATES.PROCESSING);
+  //       console.log(mediaRecorderRef.current.state);
+
+  //       console.log("Recorder stopped!");
+  //     }
+  //   }, 1500);
+  // };
 
   // logic to stop or halt previous api requests if user starts again
   const cancelCurrentOperation = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
     // Clear voice detection interval
     if (voiceIntervalRef.current) {
       clearInterval(voiceIntervalRef.current);
       voiceIntervalRef.current = null;
     }
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
+      abortControllerRef.current = new AbortController();
     }
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
-      silenceTimer = null;
+      silenceTimerRef.current = null;
     }
     if (
       mediaRecorderRef.current &&
