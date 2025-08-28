@@ -1,0 +1,8 @@
+<canvas
+            className={`absolute pointer-events-none transition-opacity duration-300 ease-in-out ${
+              showWaveform ? "opacity-100" : "opacity-0"
+            }`}
+            ref={canvasRef}
+            width={300}
+            height={300}
+          ></canvas>
